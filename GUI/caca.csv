@@ -1,0 +1,16 @@
+id,nom,produit,quantite,prix,date_ajout
+1,Apple,Smartphone iPhone 14,50,899.0,
+2,Samsung,Smartphone Galaxy S23,40,799.0,
+3,Sony,"TV 55"" OLED",10,1299.0,
+4,LG,Refrigerator 400L,8,1199.0,
+5,Bosch,Washing Machine 8kg,12,649.0,
+6,HP,Laptop Pavilion 15,20,599.0,
+7,Dell,Laptop XPS 13,15,999.0,
+8,Logitech,Wireless Mouse MX Master 3,60,49.99,
+9,Logitech,Mechanical Keyboard,45,89.99,
+10,Nike,Running Shoes Air Zoom,70,119.99,
+11,Adidas,Football Shoes Predator,55,129.99,
+12,Puma,Sports T-Shirt,120,29.99,
+13,Nestle,Coffee Nescafe 250g,200,6.99,
+14,TRZR,FD DF,5,100.0,2025-12-15 10:14:52
+15,Nike,Nike Shox TL style sakura,1000,199.99,2025-12-15 10:58:08

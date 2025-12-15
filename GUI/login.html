@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Connexion — Guardia</title>
+</head>
+<body>
+    <main class="wrap" role="main">
+        <section class="promo" aria-hidden="false">
+            <div class="brand">
+                <div class="logo" aria-hidden="true">G</div>
+                <div>
+                    <h1>Guardia — Connexion</h1>
+                    <div style="font-size:13px;color:var(--muted)">Sécurisé • Professionnel • Accessible</div>
+                </div>
+            </div>
+            <p class="lead">Accédez à votre espace personnel en toute sécurité.</p>
+        </section>
+
+        <section class="card" aria-labelledby="login-title">
+            <h2 id="login-title" style="margin:0 0 6px 0">Se connecter</h2>
+            <p style="margin:0 0 14px 0;color:var(--muted)">Entrez vos identifiants pour accéder à votre compte.</p>
+
+            <!-- zone où Python peut afficher un message -->
+            <div id="pyMsg" aria-live="polite" style="font-size:13px;color:var(--muted);margin-bottom:8px"></div>
+
+            <form id="loginForm" method="post" novalidate>
+                <div class="form-row">
+                    <div>
+                        <label for="username">Nom d'utilisateur</label>
+                        <input id="username" name="username" type="text" autocomplete="username" required />
+                        <div class="errors" id="err-username" aria-live="polite"></div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div>
+                        <label for="password">Mot de passe</label>
+                        <div class="password-wrap">
+                            <input id="password" name="password" type="password" autocomplete="current-password" required />
+                            <button type="button" class="toggle-eye" id="togglePwd" aria-label="Afficher le mot de passe">👁️</button>
+                        </div>
+                        <div class="errors" id="err-password" aria-live="polite"></div>
+                    </div>
+                </div>
+
+                <div class="controls" style="margin: 16px 0;">
+                    <label class="checkbox">
+                        <input type="checkbox" id="remember" name="remember">
+                        <span>Se souvenir de moi</span>
+                    </label>
+                    <div style="font-size:13px;color:var(--muted); margin-top: 8px;">
+                        <a href="#" style="color:var(--accent);text-decoration:none">Mot de passe oublié ?</a>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:12px; align-items:center; margin-top:6px;">
+                    <button id="loginBtn" class="btn" type="submit">Se connecter</button>
+                    <div id="progress" style="color:var(--muted);font-size:13px;display:none">Connexion en cours...</div>
+                </div>
+                <div id="message" style="margin: 10px 0; padding: 10px; border-radius: 4px; display: none;"></div>
+            </form>
+
+            <div style="text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted);">
+                Pas encore de compte ? <a href="template.html" style="color:var(--accent);text-decoration:none">S'inscrire</a>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Fonction pour basculer la visibilité du mot de passe
+        document.getElementById('togglePwd').addEventListener('click', function() {
+            const passwordInput = document.getElementById('password');
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+        });
+
+        // Gestion de la soumission du formulaire
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Réinitialisation des messages d'erreur
+            document.querySelectorAll('.errors').forEach(el => el.textContent = '');
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = '';
+            messageDiv.style.display = 'none';
+            
+            // Validation simple
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const progress = document.getElementById('progress');
+            
+            let isValid = true;
+            
+            if (!username) {
+                document.getElementById('err-username').textContent = 'Le nom d\'utilisateur est requis';
+                isValid = false;
+            }
+            
+            if (!password) {
+                document.getElementById('err-password').textContent = 'Le mot de passe est requis';
+                isValid = false;
+            }
+            
+            if (isValid) {
+                loginBtn.disabled = true;
+                loginBtn.textContent = 'Connexion...';
+                progress.style.display = 'block';
+                
+                window.pywebview.api.handle_login(username, password)
+                    .then(function(response) {
+                        messageDiv.textContent = response.message;
+                        messageDiv.style.color = response.success ? 'green' : 'red';
+                        messageDiv.style.display = 'block';
+                        
+                        if (response.success) {
+                            // Rediriger vers le tableau de bord après connexion réussie
+                            setTimeout(function() {
+                                window.pywebview.api.navigate('dashboard');
+                            }, 1000);
+                        } else {
+                            loginBtn.disabled = false;
+                            loginBtn.textContent = 'Se connecter';
+                            progress.style.display = 'none';
+                        }
+                    })
+                    .catch(function(error) {
+                        console.error('Erreur lors de la connexion:', error);
+                        messageDiv.textContent = 'Une erreur est survenue lors de la connexion';
+                        messageDiv.style.color = 'red';
+                        messageDiv.style.display = 'block';
+                        
+                        loginBtn.disabled = false;
+                        loginBtn.textContent = 'Se connecter';
+                        progress.style.display = 'none';
+                    });
+            }
+        });
+
+        // Permet à Python d'envoyer un message visible
+        function updateMessage(msg) {
+            const el = document.getElementById('pyMsg');
+            if (el) el.textContent = msg;
+            else console.log(msg);
+        }
+    </script>
+    
+    <!-- INJECT_CSS -->
+</body>
+</html>

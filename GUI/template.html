@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Inscription — Guardia</title>
+</head>
+<body>
+    <main class="wrap" role="main">
+        <section class="promo" aria-hidden="false">
+            <div class="brand">
+                <div class="logo" aria-hidden="true">G</div>
+                <div>
+                    <h1>Guardia — Création de compte</h1>
+                    <div style="font-size:13px;color:var(--muted)">Sécurisé • Professionnel • Accessible</div>
+                </div>
+            </div>
+            <p class="lead">Rejoignez Guardia et gérez vos projets en toute sécurité.</p>
+        </section>
+
+        <section class="card" aria-labelledby="signup-title">
+            <h2 id="signup-title" style="margin:0 0 6px 0">Créer un compte</h2>
+            <p style="margin:0 0 14px 0;color:var(--muted)">Remplissez les informations ci-dessous pour commencer.</p>
+
+            <!-- zone où Python peut afficher un message -->
+            <div id="pyMsg" aria-live="polite" style="font-size:13px;color:var(--muted);margin-bottom:8px"></div>
+
+            <!-- Affichage erreur / succès serveur -->
+            
+
+            <form id="registerForm" method="post" action=" novalidate">
+                <div class="form-row">
+                    <div>
+                        <label for="username">username</label>
+                        <input id="username" name="username" type="text" autocomplete="name"/>
+                        <div class="errors" id="err-username" aria-live="polite"></div>
+                    </div>
+
+
+                <div class="form-row">
+                    <div>
+                        <label for="password">Mot de passe</label>
+                        <div class="password-wrap">
+                            <input id="password" name="password" type="password" autocomplete="new-password" />
+                            <button type="button" class="toggle-eye" id="togglePwd" aria-label="Afficher le mot de passe">👁️</button>
+                        </div>
+                        <div class="strength" aria-hidden="true" title="Indicateur de force">
+                            <i id="pwdStrengthBar"></i>
+                        </div>
+                        <div class="field-help">Utilisez lettres, chiffres et caractères spéciaux.</div>
+                        <div class="errors" id="err-password" aria-live="polite"></div>
+                    </div>
+
+                <div class="controls">
+                    <label class="checkbox"><input id="terms" name="terms" type="checkbox" required /> <span>J'accepte les <a href="#" style="color:var(--accent);text-decoration:none">conditions d'utilisation</a></span></label>
+                    <div style="font-size:13px;color:var(--muted)">Déjà inscrit ? <a href="./login.php" style="color:var(--accent);text-decoration:none">Se connecter</a></div>
+                </div>
+
+                <div style="display:flex; gap:12px; align-items:center; margin-top:6px;">
+                    <button id="submitBtn" class="btn" type="submit">S'inscrire</button>
+                    <div id="progress" style="color:var(--muted);font-size:13px;display:none">Enregistrement...</div>
+                </div>
+            </form>
+        </section>
+
+        <!-- placeholder : le CSS sera injecté par style.py -->
+        <!-- INJECT_CSS -->
+    </main>
+
+    <script>
+        // Permet à Python d'envoyer un message visible (appelé par style.py via evaluate_js)
+        function updateMessage(msg){
+            const el = document.getElementById('pyMsg');
+            if(el) el.textContent = msg;
+            else console.log(msg);
+        }
+
+        // Validation client légère — soumet le formulaire au serveur si OK
+        const form = document.getElementById('registerForm');
+        const email = document.getElementById('email');
+        const fullname = document.getElementById('fullname');
+        const phone = document.getElementById('phone');
+        const pwd = document.getElementById('password');
+        const confirm = document.getElementById('confirm');
+        const terms = document.getElementById('terms');
+        const submitBtn = document.getElementById('submitBtn');
+        const progress = document.getElementById('progress');
+        const togglePwd = document.getElementById('togglePwd');
+        const strengthBar = document.getElementById('pwdStrengthBar');
+
+        function setError(id, message){
+            const el = document.getElementById('err-'+id);
+            if(el) el.textContent = message || '';
+        }
+        function emailValid(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+        function phoneValid(v){ if(!v) return true; return /^[0-9+()\-.\s]{6,25}$/.test(v); }
+        function passwordStrengthValue(p){
+            let score=0; if(!p) return 0;
+            if(p.length>=8) score++; if(p.length>=12) score++;
+            if(/[A-Z]/.test(p)) score++; if(/[0-9]/.test(p)) score++;
+            if(/[^A-Za-z0-9]/.test(p)) score++; return Math.min(score,5);
+        }
+        function updateStrength(){ const s = passwordStrengthValue(pwd.value); strengthBar.style.width = ((s/5)*100)+'%'; }
+
+        togglePwd.addEventListener('click', () => {
+            const isPwd = pwd.type === 'password';
+            pwd.type = isPwd ? 'text' : 'password';
+            confirm.type = isPwd ? 'text' : 'password';
+            togglePwd.textContent = isPwd ? '🙈' : '👁️';
+        });
+
+        pwd.addEventListener('input', ()=>{ updateStrength(); setError('password',''); });
+        confirm.addEventListener('input', ()=> setError('confirm',''));
+        email.addEventListener('input', ()=> setError('email',''));
+        fullname.addEventListener('input', ()=> setError('fullname',''));
+        phone.addEventListener('input', ()=> setError('phone',''));
+
+        form.addEventListener('submit', (e) => {
+            // client-side checks ; if not OK prevent submit
+            setError('fullname',''); setError('email',''); setError('password',''); setError('confirm',''); setError('phone','');
+            let ok = true;
+            if(!fullname.value || fullname.value.trim().length < 2){ setError('fullname','Veuillez saisir votre nom complet (2 caractères minimum).'); ok=false; }
+            if(!email.value || !emailValid(email.value.trim())){ setError('email','Adresse e-mail invalide.'); ok=false; }
+            if(!pwd.value || pwd.value.length < 8){ setError('password','Le mot de passe doit contenir au moins 8 caractères.'); ok=false; }
+            if(pwd.value !== confirm.value){ setError('confirm','Les mots de passe ne correspondent pas.'); ok=false; }
+            if(!phoneValid(phone.value.trim())){ setError('phone','Numéro de téléphone invalide.'); ok=false; }
+            if(!terms.checked){ alert('Vous devez accepter les conditions d\'utilisation.'); ok=false; }
+
+            if(!ok){
+                e.preventDefault();
+                return;
+            }
+            // show progress while server handles post
+            submitBtn.disabled = true;
+            progress.style.display = 'block';
+            // allow normal submit to server; progress will stop on page reload/response
+        });
+
+        // keyboard accessible toggle
+        togglePwd.addEventListener('keydown', (e) => {
+            if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePwd.click(); }
+        });
+
+        updateStrength();
+    </script>
+</body>
+</html>

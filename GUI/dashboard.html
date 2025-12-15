@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de bord - Gestion des produits</title>
+    <style>
+        :root {
+            --primary: #4a6cf7;
+            --primary-dark: #3a5bd9;
+            --text: #333;
+            --text-light: #666;
+            --border: #e1e4e8;
+            --bg: #f8f9fa;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 15px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 24px;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-add {
+            background-color: var(--success);
+        }
+
+        .btn-edit {
+            background-color: var(--warning);
+            color: #000;
+        }
+
+        .btn-delete {
+            background-color: var(--danger);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: var(--primary);
+            color: white;
+            font-weight: 500;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 13px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 500px;
+            position: relative;
+        }
+
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .alert {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        @media (max-width: 768px) {
+            .actions {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gestion des produits</h1>
+            <button id="addProductBtn" class="btn btn-add">
+                + Ajouter un produit
+            </button>
+        </header>
+
+        <div id="alertBox" class="alert"></div>
+
+        <div class="table-responsive">
+            <table id="productsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Marque</th>
+                        <th>Produit</th>
+                        <th>Quantité</th>
+                        <th>Prix (€)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="productsTableBody">
+                    <!-- Les produits seront chargés ici dynamiquement -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal Ajouter/Modifier Produit -->
+    <div id="productModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">Ajouter un produit</h2>
+            <form id="productForm">
+                <input type="hidden" id="productId">
+                <div class="form-group">
+                    <label for="name">Marque *</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="product">Produit *</label>
+                    <input type="text" id="product" name="product" required>
+                </div>
+                <div class="form-group">
+                    <label for="quantity">Quantité *</label>
+                    <input type="number" id="quantity" name="quantity" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="price">Prix (€) *</label>
+                    <input type="number" id="price" name="price" step="0.01" min="0" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancelBtn" class="btn">Annuler</button>
+                    <button type="submit" id="saveBtn" class="btn btn-add">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let products = [];
+        let currentProductId = null;
+
+        // Éléments du DOM
+        const productsTableBody = document.getElementById('productsTableBody');
+        const addProductBtn = document.getElementById('addProductBtn');
+        const productModal = document.getElementById('productModal');
+        const closeBtn = document.querySelector('.close');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const productForm = document.getElementById('productForm');
+        const modalTitle = document.getElementById('modalTitle');
+        const alertBox = document.getElementById('alertBox');
+
+        // Événements
+        document.addEventListener('DOMContentLoaded', loadProducts);
+        addProductBtn.addEventListener('click', () => openModal());
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+        productForm.addEventListener('submit', saveProduct);
+        
+        function getApi() {
+            return window.pywebview && window.pywebview.api ? window.pywebview.api : null;
+        }
+
+        // Charger les produits
+        async function loadProducts() {
+            try {
+                const api = getApi();
+                if (!api || !api.charger_produits) {
+                    throw new Error("API PyWebView indisponible");
+                }
+                const produits = await api.charger_produits();
+                products = produits.map(function (p) {
+                    return {
+                        id: Number(p.id),
+                        name: p.nom || '',
+                        product: p.produit || '',
+                        quantity: Number((p.quantite !== undefined && p.quantite !== null) ? p.quantite : 0),
+                        price: Number((p.prix !== undefined && p.prix !== null) ? p.prix : 0)
+                    };
+                });
+                renderProducts();
+            } catch (error) {
+                showAlert('Erreur lors du chargement des produits', 'error');
+                console.error('Erreur:', error);
+            }
+        }
+
+        // Afficher les produits dans le tableau
+        function renderProducts() {
+            productsTableBody.innerHTML = '';
+            
+            if (products.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="6" style="text-align: center; padding: 20px;">
+                        Aucun produit trouvé. Cliquez sur "Ajouter un produit" pour commencer.
+                    </td>
+                `;
+                productsTableBody.appendChild(row);
+                return;
+            }
+            
+            products.forEach(product => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${product.id}</td>
+                    <td>${product.name}</td>
+                    <td>${product.product}</td>
+                    <td>${product.quantity}</td>
+                    <td>${formatPrice(product.price)}</td>
+                    <td class="actions">
+                        <button onclick="editProduct(${product.id})" class="btn btn-sm btn-edit">Modifier</button>
+                        <button onclick="deleteProduct(${product.id})" class="btn btn-sm btn-delete">Supprimer</button>
+                    </td>
+                `;
+                productsTableBody.appendChild(row);
+            });
+        }
+
+        // Ouvrir le modal d'ajout/modification
+        function openModal(productId = null) {
+            currentProductId = productId;
+            
+            if (productId) {
+                // Mode édition
+                modalTitle.textContent = 'Modifier le produit';
+                const product = products.find(p => p.id === productId);
+                if (product) {
+                    document.getElementById('productId').value = product.id;
+                    document.getElementById('name').value = product.name;
+                    document.getElementById('product').value = product.product;
+                    document.getElementById('quantity').value = product.quantity;
+                    document.getElementById('price').value = product.price;
+                }
+            } else {
+                // Mode ajout
+                modalTitle.textContent = 'Ajouter un produit';
+                productForm.reset();
+                document.getElementById('productId').value = '';
+            }
+            
+            productModal.style.display = 'flex';
+        }
+
+        // Fermer le modal
+        function closeModal() {
+            productModal.style.display = 'none';
+        }
+
+        // Enregistrer un produit
+        async function saveProduct(e) {
+            e.preventDefault();
+            
+            const productData = {
+                id: document.getElementById('productId').value,
+                name: document.getElementById('name').value.trim(),
+                product: document.getElementById('product').value.trim(),
+                quantity: parseInt(document.getElementById('quantity').value),
+                price: parseFloat(document.getElementById('price').value)
+            };
+            
+            try {
+                const api = getApi();
+                if (!api) {
+                    throw new Error("API PyWebView indisponible");
+                }
+                if (productData.id) {
+                    await api.mettre_a_jour_produit(
+                        parseInt(productData.id, 10),
+                        productData.name,
+                        productData.price,
+                        productData.quantity,
+                        productData.product
+                    );
+                    showAlert('Produit mis à jour avec succès', 'success');
+                } else {
+                    await api.ajouter_produit(
+                        productData.name,
+                        productData.price,
+                        productData.quantity,
+                        productData.product
+                    );
+                    showAlert('Produit ajouté avec succès', 'success');
+                }
+                
+                await loadProducts();
+                closeModal();
+                
+            } catch (error) {
+                showAlert('Erreur lors de la sauvegarde du produit', 'error');
+                console.error('Erreur:', error);
+            }
+        }
+
+        // Éditer un produit
+        function editProduct(id) {
+            openModal(id);
+        }
+
+        // Supprimer un produit
+        async function deleteProduct(id) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
+                try {
+                    const api = getApi();
+                    if (!api) {
+                        throw new Error("API PyWebView indisponible");
+                    }
+                    await api.supprimer_produit(id);
+                    showAlert('Produit supprimé avec succès', 'success');
+                    await loadProducts();
+                    
+                } catch (error) {
+                    showAlert('Erreur lors de la suppression du produit', 'error');
+                    console.error('Erreur:', error);
+                }
+            }
+        }
+
+        // Afficher une alerte
+        function showAlert(message, type = 'success') {
+            alertBox.textContent = message;
+            alertBox.className = `alert alert-${type}`;
+            alertBox.style.display = 'block';
+            
+            // Masquer l'alerte après 5 secondes
+            setTimeout(() => {
+                alertBox.style.display = 'none';
+            }, 5000);
+        }
+
+        // Formater un prix
+        function formatPrice(price) {
+            return new Intl.NumberFormat('fr-FR', { 
+                style: 'currency', 
+                currency: 'EUR',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2 
+            }).format(price);
+        }
+
+        // Fermer le modal si on clique en dehors
+        window.addEventListener('click', (e) => {
+            if (e.target === productModal) {
+                closeModal();
+            }
+        });
+
+        // Exposer les fonctions au scope global pour les boutons dans le HTML
+        window.editProduct = editProduct;
+        window.deleteProduct = deleteProduct;
+    </script>
+</body>
+</html>
