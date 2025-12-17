@@ -118,7 +118,9 @@ class WebViewApp:
             
             def mettre_a_jour_produit(self, id_produit, nom, prix, quantite, produit=""):
                 return self.app.mettre_a_jour_produit(id_produit, nom, prix, quantite, produit)
-        
+
+            def rechercher_produits(self, terme):
+                return self.app.rechercher_produits(terme)
         # Créer l'instance de l'API
         api = API(self)
         
@@ -134,6 +136,8 @@ class WebViewApp:
         
         # Démarrer la boucle d'événements
         webview.start(debug=True)
+
+        
     
     # Méthodes pour la gestion des produits
     def ajouter_produit(self, nom, prix, quantite, produit=""):
@@ -174,6 +178,21 @@ class WebViewApp:
                 'date_ajout': row.get('date_ajout', '')
             } for row in reader if row.get('id')]
     
+    def rechercher_produits(self, terme_recherche):
+        produits = self.charger_produits()
+        if not terme_recherche or terme_recherche.strip() == "":
+            return produits
+        terme_recherche = terme_recherche.lower().strip()
+        resultats = []
+
+        for produit in produits:
+            nom = produit.get('nom', '').lower()
+            cat_produit = produit.get('produit', '').lower()
+
+            if terme_recherche in nom or terme_recherche in cat_produit:
+                resultats.append(produit)
+        return resultats
+
     def sauvegarder_produits(self, produits):
         """Sauvegarde la liste des produits dans le fichier CSV"""
         try:
@@ -338,6 +357,8 @@ class WebViewApp:
         """Charge un template HTML et injecte le CSS"""
         template_path = self.base_path / f"{template_name}.html"
         html_text = template_path.read_text(encoding="utf-8")
+
+    
         
         # Ajouter le code JavaScript directement dans le HTML
         js_code = """
