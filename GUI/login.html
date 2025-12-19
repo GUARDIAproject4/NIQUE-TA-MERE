@@ -17,7 +17,15 @@
             </div>
             <p class="lead">Accédez à votre espace personnel en toute sécurité.</p>
         </section>
-
+     <div class="security-card">
+        <h3>🛡️ Vérification de Mots de Passe (API Sécurisée)</h3>
+        <p style="color: var(--text-muted); margin-bottom: 5px;">Vérifiez si un mot de passe a été piraté sans le révéler (k-Anonymity).</p>
+        <div class="sec-input-group">
+            <input type="password" id="secPwd" placeholder="Entrez un mot de passe à tester...">
+            <button class="action-btn" onclick="verifierSecurite()">Vérifier</button>
+        </div>
+        <div id="secResult" style="margin-top: 10px; font-weight: bold;"></div>
+    </div>
         <section class="card" aria-labelledby="login-title">
             <h2 id="login-title" style="margin:0 0 6px 0">Se connecter</h2>
             <p style="margin:0 0 14px 0;color:var(--muted)">Entrez vos identifiants pour accéder à votre compte.</p>
@@ -69,6 +77,76 @@
     </main>
 
     <script>
+    // --- 1. FONCTION SECURITÉ (Version Debug) ---
+    function verifierSecurite() {
+        var pwd = document.getElementById('secPwd').value;
+        var res = document.getElementById('secResult');
+        
+        // Affiche la boîte immédiatement
+        if(!pwd) { 
+            res.style.display = "block";
+            res.style.backgroundColor = "#f8d7da"; // Rouge clair
+            res.style.color = "#721c24";
+            res.innerText = "⚠️ Veuillez écrire un mot de passe."; 
+            return; 
+        }
+
+        // Etat "En cours"
+        res.style.display = "block";
+        res.style.backgroundColor = "#e2e3e5"; // Gris clair
+        res.style.color = "#383d41";
+        res.innerHTML = "⏳ Analyse en cours...";
+
+        if(window.pywebview) {
+            window.pywebview.api.check_security(pwd)
+            .then(function(resp) {
+                res.innerHTML = resp.message;
+                
+                if(resp.status === 'danger') {
+                    // ROUGE (Danger)
+                    res.style.backgroundColor = "#f8d7da"; 
+                    res.style.color = "#dc3545";
+                    res.style.border = "1px solid #f5c6cb";
+                } else if(resp.status === 'safe') {
+                    // VERT (Sûr)
+                    res.style.backgroundColor = "#d4edda";
+                    res.style.color = "#155724";
+                    res.style.border = "1px solid #c3e6cb";
+                } else {
+                    // JAUNE (Erreur)
+                    res.style.backgroundColor = "#fff3cd";
+                    res.style.color = "#856404";
+                }
+            })
+            .catch(function(err) {
+                res.innerText = "Erreur Python : " + err;
+                res.style.backgroundColor = "orange";
+            });
+        } else {
+            res.innerText = "Erreur : Lancez via Python (gui.py)";
+        }
+    }
+
+    // --- 2. FONCTION CONNEXION ---
+    function handleLogin() {
+        var u = document.getElementById('username').value;
+        var p = document.getElementById('password').value;
+        var msg = document.getElementById('loginMsg');
+
+        if(window.pywebview) {
+            window.pywebview.api.login(u, p).then(function(ok) {
+                if(ok) {
+                    msg.innerText = "Connexion réussie...";
+                    msg.style.color = "green";
+                    setTimeout(function(){ window.location.href = 'dashboard.html'; }, 1000);
+                } else {
+                    msg.innerText = "Identifiants incorrects (Essayez admin/admin)";
+                    msg.style.color = "red";
+                }
+            });
+        }
+    }
+
         // Fonction pour basculer la visibilité du mot de passe
         document.getElementById('togglePwd').addEventListener('click', function() {
             const passwordInput = document.getElementById('password');
@@ -146,7 +224,20 @@
             else console.log(msg);
         }
     </script>
-    
+    <style>/* Widget Sécurité */
+        .security-card {
+            background-color: var(--bg-card);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            border-left: 5px solid var(--primary);
+        }
+        .sec-input-group { display: flex; gap: 10px; margin-top: 10px; }
+        input { 
+            padding: 10px; border: 1px solid var(--border); border-radius: 4px; 
+            background: var(--input-bg); color: var(--text-main); flex: 1;
+        }</style>
     <!-- INJECT_CSS -->
 </body>
 </html>
