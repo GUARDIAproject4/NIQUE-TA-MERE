@@ -8,6 +8,8 @@ import time
 import json
 import csv
 import os
+import hashlib
+import requests
 from flask import Flask, render_template_string, request, jsonify
 from datetime import datetime
 
@@ -96,6 +98,48 @@ class WebViewApp:
     def verify_password(self, stored_password, provided_password):
         """Vérifie si le mot de passe fourni correspond au hash stocké"""
         return bcrypt.checkpw(provided_password.encode('utf-8'), stored_password.encode('utf-8'))
+    
+    def check_security(self, password):
+        """
+        Vérifie le mot de passe via l'API HIBP (k-Anonymity).
+        Appelé depuis le JS : window.pywebview.api.check_security(pwd)
+        """
+        if not password:
+            return {'status': 'error', 'message': "Mot de passe vide."}
+
+        # 1. Hachage SHA-1 (Obligatoire pour l'API HIBP)
+        sha1_password = hashlib.sha1(password.encode('utf-8')).hexdigest().upper()
+        prefix = sha1_password[:5]
+        suffix = sha1_password[5:]
+
+        try:
+            # 2. Appel API (Timeout court de 2s pour ne pas geler l'interface)
+            url = f"https://api.pwnedpasswords.com/range/{prefix}"
+            response = requests.get(url, timeout=2)
+
+            if response.status_code != 200:
+                # Fail-open: Si l'API échoue, on ne bloque pas l'utilisateur
+                return {'status': 'warning', 'message': f"Erreur API ({response.status_code})"}
+
+            # 3. Analyse de la réponse (Recherche du suffixe)
+            hashes = (line.split(':') for line in response.text.splitlines())
+            for h, count in hashes:
+                if h == suffix:
+                    # CAS DANGER : Mot de passe trouvé
+                    return {
+                        'status': 'danger',
+                        'message': f"⚠️ Ce mot de passe a été piraté {count} fois !"
+                    }
+
+            # CAS SÛR : Non trouvé
+            return {
+                'status': 'safe',
+                'message': "✅ Ce mot de passe n'est pas dans la base de fuites."
+            }
+
+        except requests.RequestException:
+            # En cas de coupure internet, on renvoie un warning mais ça ne plante pas l'app
+            return {'status': 'warning', 'message': "⚠️ Vérification impossible (Pas d'internet)."}
     
     def main_window(self):
         """Crée et affiche la fenêtre principale"""
