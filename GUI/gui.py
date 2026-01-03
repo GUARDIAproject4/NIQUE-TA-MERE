@@ -14,6 +14,43 @@ from flask import Flask, render_template_string, request, jsonify
 from datetime import datetime
 
 class WebViewApp:
+    class JSAPI:
+        """Minimal API wrapper exposed to JavaScript. Exposes only safe callables."""
+        def __init__(self, app):
+            self._app = app
+
+        # Authentication / navigation
+        def handle_register(self, username, password):
+            return self._app.handle_register(username, password)
+
+        def handle_login(self, username, password):
+            return self._app.handle_login(username, password)
+
+        def navigate(self, page):
+            return self._app.navigate(page)
+
+        def check_security(self, password):
+            return self._app.check_security(password)
+
+        # Product management (dashboard)
+        def ajouter_produit(self, nom, prix, quantite, produit=""):
+            return self._app.ajouter_produit(nom, prix, quantite, produit)
+
+        def supprimer_produit(self, id_produit):
+            return self._app.supprimer_produit(id_produit)
+
+        def charger_produits(self):
+            return self._app.charger_produits()
+
+        def sauvegarder_produits(self, produits):
+            return self._app.sauvegarder_produits(produits)
+
+        def mettre_a_jour_produit(self, id_produit, nom, prix, quantite, produit=""):
+            return self._app.mettre_a_jour_produit(id_produit, nom, prix, quantite, produit)
+
+        def rechercher_produits(self, terme):
+            return self._app.rechercher_produits(terme)
+
     def __init__(self):
         self.window = None
         self.base_path = Path(__file__).parent
@@ -36,14 +73,36 @@ class WebViewApp:
     def is_connection_alive(self, connection):
         """Vérifie si la connexion à la base de données est toujours active"""
         try:
-            if connection is None or not connection.is_connected():
+            if connection is None:
                 return False
+
+            # connection.is_connected() may raise low-level exceptions (IndexError) when the
+            # underlying socket/packet state is corrupted; handle defensively.
+            try:
+                if not connection.is_connected():
+                    return False
+            except Exception as e:
+                print(f"[DB] is_connection_alive: is_connected() raised: {e}", flush=True)
+                try:
+                    connection.close()
+                except Exception:
+                    pass
+                return False
+
             # Exécuter une requête simple pour vérifier la connexion
-            cursor = connection.cursor()
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-            cursor.close()
-            return True
+            try:
+                cursor = connection.cursor()
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+                cursor.close()
+                return True
+            except Exception as e:
+                print(f"[DB] is_connection_alive: health-check query failed: {e}", flush=True)
+                try:
+                    connection.close()
+                except Exception:
+                    pass
+                return False
         except (Error, mysql.connector.errors.InterfaceError, mysql.connector.errors.OperationalError):
             return False
 
@@ -82,12 +141,22 @@ class WebViewApp:
         
         # Afficher un message à l'utilisateur
         if hasattr(self, 'window') and self.window:
+            # Only attempt to call evaluate_js from the main thread; background threads
+            # may find the webview window weakly-referenced or already destroyed which
+            # raises "weakly-referenced object no longer exists". Guard and suppress.
             try:
-                self.window.evaluate_js(f"""
-                    alert('Erreur de connexion à la base de données. Assurez-vous que MySQL est en cours d\'exécution et que les paramètres de connexion sont corrects.\n\nDétails: {error_msg}');
-                """)
-            except:
-                pass
+                import threading
+                if threading.current_thread() is threading.main_thread():
+                    try:
+                        self.window.evaluate_js(f"""
+                            alert('Erreur de connexion à la base de données. Assurez-vous que MySQL est en cours d\'exécution et que les paramètres de connexion sont corrects.\n\nDétails: {error_msg}');
+                        """)
+                    except Exception as e:
+                        print(f"[GUI] evaluate_js skipped/failed: {e}", flush=True)
+                else:
+                    print("[GUI] connect_to_db: would notify UI, but not in main thread", flush=True)
+            except Exception as e:
+                print(f"[GUI] connect_to_db: safe-eval guard caught: {e}", flush=True)
                 
         return None
 
@@ -96,8 +165,31 @@ class WebViewApp:
         return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
     def verify_password(self, stored_password, provided_password):
-        """Vérifie si le mot de passe fourni correspond au hash stocké"""
-        return bcrypt.checkpw(provided_password.encode('utf-8'), stored_password.encode('utf-8'))
+        """Vérifie si le mot de passe fourni correspond au hash stocké.
+
+        Adds defensive logging on exception to help debug 'bytearray index out of range'.
+        """
+        try:
+            # Ensure both arguments are bytes for bcrypt
+            pw = provided_password.encode('utf-8') if isinstance(provided_password, str) else bytes(provided_password)
+            if isinstance(stored_password, (bytes, bytearray)):
+                stored = bytes(stored_password)
+            else:
+                stored = stored_password.encode('utf-8') if isinstance(stored_password, str) else bytes(stored_password)
+
+            return bcrypt.checkpw(pw, stored)
+        except Exception as e:
+            import traceback
+            print("verify_password: exception during bcrypt.checkpw:", e)
+            try:
+                print("  stored_password type:", type(stored_password))
+                print("  stored_password repr (truncated):", repr(stored_password)[:200])
+                print("  provided_password type:", type(provided_password))
+                print("  provided_password repr (truncated):", repr(provided_password)[:200])
+            except Exception:
+                pass
+            traceback.print_exc()
+            return False
     
     def check_security(self, password):
         """
@@ -143,30 +235,8 @@ class WebViewApp:
     
     def main_window(self):
         """Crée et affiche la fenêtre principale"""
-        # Créer une classe API pour exposer les méthodes à JavaScript
-        class API:
-            def __init__(self, app):
-                self.app = app
-            
-            def ajouter_produit(self, nom, prix, quantite, produit=""):
-                return self.app.ajouter_produit(nom, prix, quantite, produit)
-            
-            def supprimer_produit(self, id_produit):
-                return self.app.supprimer_produit(id_produit)
-            
-            def charger_produits(self):
-                return self.app.charger_produits()
-            
-            def sauvegarder_produits(self, produits):
-                return self.app.sauvegarder_produits(produits)
-            
-            def mettre_a_jour_produit(self, id_produit, nom, prix, quantite, produit=""):
-                return self.app.mettre_a_jour_produit(id_produit, nom, prix, quantite, produit)
-
-            def rechercher_produits(self, terme):
-                return self.app.rechercher_produits(terme)
-        # Créer l'instance de l'API
-        api = API(self)
+        # Use the minimal JS API wrapper to avoid exposing complex attributes
+        api = self.JSAPI(self)
         
         # Créer la fenêtre avec l'API exposée
         self.window = webview.create_window(
@@ -178,8 +248,43 @@ class WebViewApp:
             min_size=(800, 600)
         )
         
-        # Démarrer la boucle d'événements
-        webview.start(debug=True)
+        # Démarrer la boucle d'événements (debug désactivé pour éviter les devtools)
+        webview.start(debug=False)
+
+    def run(self, debug=False):
+        """Démarre l'application GUI (fenêtre de connexion par défaut)."""
+        # Vérifier la connexion à la base de données
+        if not self.connection:
+            print("Impossible de se connecter à la base de données. Vérifiez vos paramètres de connexion.")
+            # On continue quand même pour permettre à l'utilisateur de voir l'interface
+
+        # Créer la fenêtre webview avec la page de connexion par défaut
+        self.window = webview.create_window(
+            "Guardia — Connexion",
+            html=self.load_template('login'),
+            min_size=(400, 500),
+            js_api=self.JSAPI(self)  # Expose a minimal API wrapper to JavaScript
+        )
+
+        print(f"[GUI] window created at {time.strftime('%H:%M:%S')}", flush=True)
+
+        try:
+            # Démarrer la vérification périodique de la connexion
+            print(f"[GUI] starting connection check thread at {time.strftime('%H:%M:%S')}", flush=True)
+            self.start_connection_check(interval=60)
+
+            # Démarrer l'application avec l'API exposée (debug désactivé par défaut)
+            print(f"[GUI] calling webview.start() at {time.strftime('%H:%M:%S')}", flush=True)
+            try:
+                webview.start(debug=debug, http_server=False)
+            except Exception as e:
+                print(f"[GUI] webview.start raised exception: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
+        finally:
+            # S'assurer que le thread de vérification est bien arrêté
+            print(f"[GUI] stopping connection check at {time.strftime('%H:%M:%S')}", flush=True)
+            self.stop_connection_check()
 
         
     
@@ -324,7 +429,11 @@ class WebViewApp:
     def _check_connection_loop(self, interval=60):
         """Boucle de vérification de la connexion dans un thread séparé"""
         while not self._stop_event.is_set():
-            self.check_connection()
+            try:
+                self.check_connection()
+            except Exception as e:
+                # Prevent the thread from dying on unexpected errors; log and continue
+                print(f"[DB] _check_connection_loop caught exception: {e}", flush=True)
             # Attendre l'intervalle spécifié ou jusqu'à ce qu'on nous dise d'arrêter
             self._stop_event.wait(interval)
     
@@ -549,8 +658,13 @@ class WebViewApp:
     
     def navigate(self, page):
         """Appelé depuis JavaScript pour changer de page"""
-        if page != self.current_page:
-            self.current_page = page
+        if page == self.current_page:
+            return
+
+        # Update current page immediately to avoid duplicate navigation requests
+        self.current_page = page
+
+        def do_load():
             try:
                 # Charger le template avec le code JavaScript injecté
                 if page == 'dashboard':
@@ -595,19 +709,37 @@ class WebViewApp:
                         """
                         with open(dashboard_path, 'w', encoding='utf-8') as f:
                             f.write(default_dashboard)
-                
+
                 html_content = self.load_template(page)
-                self.window.load_html(html_content)
+                # load_html will replace the page and invalidate pending JS callbacks; schedule
+                # the load with a short delay so the JS side can receive the Python return value
+                # callback before the page is replaced.
+                try:
+                    self.window.load_html(html_content)
+                except Exception as e:
+                    print(f"[GUI] do_load: failed to load html: {e}", flush=True)
             except Exception as e:
-                self.window.load_html(f"<h1>Erreur</h1><p>Impossible de charger la page {page}: {str(e)}</p>")
-        
-        # Mettre à jour le titre de la fenêtre
-        titles = {
-            'login': 'Connexion',
-            'template': 'Inscription',
-            'dashboard': 'Tableau de bord'
-        }
-        self.window.set_title(f"Guardia — {titles.get(page, 'Application')}")
+                try:
+                    self.window.load_html(f"<h1>Erreur</h1><p>Impossible de charger la page {page}: {str(e)}</p>")
+                except Exception:
+                    print(f"[GUI] do_load exception while reporting error: {e}", flush=True)
+
+            # Mettre à jour le titre de la fenêtre (attempt; may fail if window gone)
+            try:
+                titles = {
+                    'login': 'Connexion',
+                    'template': 'Inscription',
+                    'dashboard': 'Tableau de bord'
+                }
+                self.window.set_title(f"Guardia — {titles.get(page, 'Application')}")
+            except Exception:
+                pass
+
+        # Schedule the page load slightly delayed to allow the JS return callback to run
+        t = threading.Timer(0.05, do_load)
+        t.daemon = True
+        t.start()
+        return True
 
 def main():
     app = WebViewApp()
@@ -622,17 +754,25 @@ def main():
         "Guardia — Connexion",
         html=app.load_template('login'),
         min_size=(400, 500),
-        js_api=app  # Expose l'instance de l'application à JavaScript
+            js_api=app.JSAPI(app)  # Expose a minimal API wrapper to JavaScript
     )
     
     try:
         # Démarrer la vérification périodique de la connexion
+        print(f"[GUI main] window created at {time.strftime('%H:%M:%S')}", flush=True)
+        print(f"[GUI main] starting connection check at {time.strftime('%H:%M:%S')}", flush=True)
         app.start_connection_check(interval=60)  # Vérification toutes les 60 secondes
-        
-        # Démarrer l'application avec l'API exposée
-        webview.start(debug=True, http_server=False)
+
+        print(f"[GUI main] calling webview.start() at {time.strftime('%H:%M:%S')}", flush=True)
+        try:
+            webview.start(debug=False, http_server=False)
+        except Exception as e:
+            print(f"[GUI main] webview.start raised exception: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
     finally:
         # S'assurer que le thread de vérification est bien arrêté
+        print(f"[GUI main] stopping connection check at {time.strftime('%H:%M:%S')}", flush=True)
         app.stop_connection_check()
 
 if __name__ == "__main__":

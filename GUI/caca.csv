@@ -1,5 +1,4 @@
 id,nom,produit,quantite,prix,date_ajout
-1,Apple,Smartphone iPhone 14,50,899.0,
 2,Samsung,Smartphone Galaxy S23,40,799.0,
 3,Sony,"TV 55"" OLED",10,1299.0,
 4,LG,Refrigerator 400L,8,1199.0,
@@ -14,5 +13,6 @@ id,nom,produit,quantite,prix,date_ajout
 13,Nestle,Coffee Nescafe 250g,200,6.99,
 15,Nike,Nike Shox TL style sakura,1000,199.99,2025-12-15 10:58:08
 16,carrefour,rond point,2,2.5,2025-12-15 12:07:33
-17,FLOFLO,florian a poil,1,10000.0,2025-12-15 16:23:57
 19,Apple,AirPods pro ,1000,239.99,2025-12-17 10:04:13
+20,nike,sneacker,1,200.0,2026-01-03 17:12:48
+21,test,test,1,1.0,2026-01-03 18:10:27
